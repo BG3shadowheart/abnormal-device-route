@@ -1,37 +1,41 @@
-@echo off
-setlocal
-cd /d "%~dp0"
-title ABNORMAL - Add Product
 
-echo.
-echo =====================================================
-echo        ABNORMAL - PRODUCT CREATOR
-echo =====================================================
-echo.
-echo This wizard asks for category, product name, summary,
-echo durations, and the prices you actually charge.
-echo.
-echo Example descriptions:
-echo   PC:      Windows PC build with 1 Day and 1 Month access.
-echo   Android: Android non-root build with 1 Day, 7 Days, or 30 Days access.
-echo   iOS:     iPhone and iPad build with 1 Day or 1 Month access.
-echo.
-where node >nul 2>nul
-if errorlevel 1 (
-  echo ERROR: Node.js 20.9 or newer is required.
-  echo Install the current Node.js LTS from https://nodejs.org and run this BAT again.
-  pause
-  exit /b 1
-)
-node "%~dp0scripts\add-product.mjs"
-if errorlevel 1 (
-  echo.
-  echo Product was not saved. Check the message above and try again.
-) else (
-  echo.
-  echo Done! The new product is now in src\data\custom-products.json.
-)
-echo.
-echo If the local preview is running, refresh it. After deploying, rebuild the website.
-pause
-endlocal
+const PC_SITE = "https://abnormal-shop.vercel.app";
+const PHONE_SITE = "https://abnormal-store.vercel.app";
+
+export async function onRequest(context) {
+  const request = context.request;
+  const url = new URL(request.url);
+
+  // Route only the homepage.
+  if (url.pathname !== "/") {
+    return new Response("Not found", { status: 404 });
+  }
+
+  // Manual version selection for testing or switching.
+  const view = url.searchParams.get("view");
+
+  let destination;
+
+  if (view === "desktop") {
+    destination = PC_SITE;
+  } else if (view === "mobile") {
+    destination = PHONE_SITE;
+  } else {
+    const ua = request.headers.get("user-agent") || "";
+
+    const isMobile =
+      /Android|iPhone|iPod|Mobile|Windows Phone|IEMobile/i.test(ua);
+
+    destination = isMobile ? PHONE_SITE : PC_SITE;
+  }
+
+  // Preserve query parameters, except the routing override.
+  const target = new URL(destination);
+  for (const [key, value] of url.searchParams) {
+    if (key !== "view") {
+      target.searchParams.append(key, value);
+    }
+  }
+
+  return Response.redirect(target.toString(), 307);
+}
